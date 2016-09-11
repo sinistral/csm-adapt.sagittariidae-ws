@@ -1,6 +1,6 @@
-(ns sagittariidae.core-test
+(ns sagittariidae.ws.core-test
   (:require [clojure.test :refer :all]
-            [sagittariidae.core :refer :all]))
+            [sagittariidae.ws.core :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."
