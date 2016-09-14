@@ -1,0 +1,211 @@
+
+[
+ ;; --- Project
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :project/id
+  :db/valueType   :db.type/bigint
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The unique project identifier.  This numeric identifier is used
+  internally as the basis for the obfuscated ID that is exposed to external
+  agents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :project/obfuscated-id
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The unique obfuscated identifier for a project.  Calculated from the
+  numeric `id`, this is the label by which a project is known to all external
+  agents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :project/name
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The human-readable name of the project.  A name is maintained in
+  addition to the identifiers to decouple the human readable 'description' of a
+  project from its identity, allowing the name to be changed if necessary."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :project/sample-mask
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "A mask that describes the structure of names of the samples that
+  will be the subjects of the project.  It is expressed as a regular
+  expression against which a sample name must successfully match."
+  :db.install/_attribute :db.part/db}
+
+ ;; --- Sample
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :sample/id
+  :db/valueType   :db.type/bigint
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The unique sample identifier.  This numeric identifier is used
+  internally as the basis for the obfuscated ID that is exposed to external
+  agents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :sample/obfuscated-id
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The unique obfuscated identifier for a sample.  Calculated from the
+  numeric `id`, this is the label by which a sample is known to all external
+  agents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :sample/name
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The name of the sample, codified according to the project
+  requirements, and mask."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :sample/stage
+  :db/valueType   :db.type/ref ;; references :stage
+  :db/cardinality :db.cardinality/many
+  :db/doc "The stages of a sample's lifecycle."
+  :db.install/_attribute :db.part/db}
+
+ ;; --- Method
+ ;; The tests or analyses that may be applied to a sample.
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :method/id
+  :db/valueType   :db.type/bigint
+  :db/cardinality :db.cardinality/one
+  :db/doc "The unique method identifier.  This numeric identifier is used
+  internally as the basis for the obfuscated ID that is exposed to external
+  agents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :method/obfuscated-id
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The unique obfuscated identifier for a method.  Calculated from the
+  numeric `id`, this is the label by which a method is known to all external
+  agents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :method/name
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/value
+  :db/doc "The human-readable name of the method"
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :method/description
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "The human-readable description of the method."
+  :db.install/_attribute :db.part/db}
+
+ ;; --- Stage
+ ;; This entity encapsulates the application a test method to a sample.
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :stage/id
+  :db/valueType   :db.type/bigint
+  :db/unique      :db.unique/value
+  :db/cardinality :db.cardinality/one
+  :db/doc "A unique stage identifier that reflects an ordering between stages.
+  Some tests may be destructive and it is important that we are able to
+  unambiguously determine the order in which tests have been conducted.  It is
+  also used internally as the basis for the obfuscated ID that is exposed to
+  external agents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :stage/obfuscated-id
+  :db/valueType   :db.type/string
+  :db/unique      :db.unique/value
+  :db/cardinality :db.cardinality/one
+  :db/doc "The unique obfuscated identifier for a stage.  Calculated from the
+  numeric identifier, this is the label by which a project is known to all
+  external agents.  The numeric `id` is significant for the relative stage
+  ordering that it imposes, not for its ordinal value.  Thus the value is
+  obfuscated to prevent meaning from being inferred where none is intended."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :stage/annotation
+  :db/valueType   :db.type/ref ;; references :annotation
+  :db/cardinality :db.cardinality/many
+  :db/doc "An annotation (essentially a tag) associated with the stage.
+  Typically used to capture metadata (such as process parameters) that may
+  contribute to understanding the context of the process that the stage
+  represents."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :stage/datafile
+  :db/valueType   :db.type/ref ;; references :datafile
+  :db/cardinality :db.cardinality/many
+  :db/doc "A datafile associated with the stage.  These files may contain the
+  results of the experiment, data collected during the process, or other
+  relevant artefacts."
+  :db.install/_attribute :db.part/db}
+
+ ;; --- Data file
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :datafile/staging-path
+  :db/valueType   :db.type/string
+  :db/unique      :db.unique/value
+  :db/cardinality :db.cardinality/one
+  :db/doc "Files are uploaded into a staging area to be validated (or, in the
+  case of archives, unpacked) before being permanently added to the repository.
+  This attribute contains the path of the staged file relative to the staging
+  root directory."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :datafile/archive-path
+  :db/valueType   :db.type/string
+  :db/unique      :db.unique/value
+  :db/cardinality :db.cardinality/one
+  :db/doc "From our perspective the data repository is simply a file system
+  tree (the implementation may be a more robust LVM, RAID device, etc, but
+  these details are hidden behind the FS abstraction).  Each data file is
+  stored relative to the root of that tree, and this attribute is that relative
+  path."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :datafile/state
+  :db/valueType   :db.type/ref ;; references: datafile.state
+  :db/cardinality :db.cardinality/one
+  :db/doc "Data files have a well-defined lifecycle, from being uploaded,
+  though validation, until they are archived as part of the permament record
+  for a sample."
+  :db.install/_attribute :db.part/db}
+
+ [:db/add #db/id[:db.part/user] :db/ident :datafile.state/staged]
+ [:db/add #db/id[:db.part/user] :db/ident :datafile.state/archived]
+
+ ;; --- Stage annotation
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :annotation/tag
+  :db/valueType   :db.type/string
+  :db/unique      :db.unique/identity
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ ]
