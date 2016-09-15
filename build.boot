@@ -1,5 +1,6 @@
 
 (def project 'sagittariidae-ws)
+
 (def version "0.1.0-SNAPSHOT")
 
 (defn- dependencies
@@ -7,9 +8,10 @@
   keys are the build stage, and values are vectors of the standard
   dependency [name version] tuple, e.g.:
   ```
-    {:build '[[org.clojure/clojure \"1.7.0\"]
-              ...]
-     :dev   '[[org.slf5j/slf4j-nop \"1.7.13\"]]}
+  (set-env! :dependencies
+            (dependencies {:build '[[org.clojure/clojure \"1.7.0\"] ...]
+                           :test  '[[midje \"1.4.0\" :exclusions [org.clojure/clojure]]]
+                           :dev   '[[org.slf4j/slf4j-nop \"1.7.13\"]]}))
   ```
   This example highlights another feature: build stage synonyms.  It can be
   (conceptually, if not practically) useful to distinguish between dependencies
@@ -29,15 +31,24 @@
              (for [[scope specs] m]
                (scope-dependencies (cond (= :build scope) "compile"
                                          (= :dev scope) "test"
-                                         :else (if (keyword? scope) (name scope) (str scope)))
+                                         :else (if (keyword? scope)
+                                                 (name scope)
+                                                 (str scope)))
                                    specs))))))
 
+;; Credentials are required and should be configured using a `profile.boot`
+;; `configure-repositories!` hook.
+;; cf. https://github.com/boot-clj/boot/wiki/Repository-Credentials-and-Deploying#environment
+(set-env! :repositories
+          #(conj % ["datomic" {:url "https://my.datomic.com/repo"}]))
+
 (set-env! :resource-paths
-          #{"resources"}
+          #{"resources" "source"}
           :source-paths
-          #{"source" "test"}
+          #{"test"}
           :dependencies
           (dependencies {:build '[[org.clojure/clojure     "1.8.0"]
+                                  [com.datomic/datomic-pro "0.9.5350"]
                                   [compojure               "1.5.1"]
                                   [http-kit                "2.1.18"]
                                   [ring/ring-core          "1.5.0"]]
