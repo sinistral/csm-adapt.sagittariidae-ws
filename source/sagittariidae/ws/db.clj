@@ -11,7 +11,7 @@
   "datomic:dev://localhost:4334")
 
 (def ^{:private true} db-schema-file
-  "sagittariidae-schema.edn")
+  "db/schema.edn")
 
 (def ^{:private true} db-name
   "sagittariidae")
