@@ -1,5 +1,65 @@
 
 [
+ ;; --- Resource
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :res-archetype/type
+  :db/valueType   :db.type/ref  ; references res.type
+  :db/cardinality :db.cardinality/one
+  :db/unique      :db.unique/identity
+  :db/doc ""
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :res-archetype/hashid-salt
+  :db/valueType   :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc ""
+  :db.install/_attribute :db.part/db}
+
+ {:db/id           #db/id[:db.part/db]
+  :db/ident       :res-archetype/hashid-length
+  :db/valueType   :db.type/long
+  :db/cardinality :db.cardinality/one
+  :db/doc ""
+  :db.install/_attribute :db.part/db}
+
+ [:db/add #db/id[:db.part/user] :db/ident :res.type/project]
+ [:db/add #db/id[:db.part/user] :db/ident :res.type/method]
+ [:db/add #db/id[:db.part/user] :db/ident :res.type/sample]
+ [:db/add #db/id[:db.part/user] :db/ident :res.type/stage]
+ [:db/add #db/id[:db.part/user] :db/ident :res.type/stage-token]
+ [:db/add #db/id[:db.part/user] :db/ident :res.type/datafile]
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :res/type
+  :db/valueType   :db.type/ref  ; references res.type
+  :db/cardinality :db.cardinality/one
+  :db/doc ""
+  :db.install/_attribute :db.part/db}
+
+ ;; The attributes associated with a resource could have been extended to
+ ;; include 'id' and 'obfuscated-id', since these are common to all resources.
+ ;; The advantage of this approach is that it entities become resources simply
+ ;; by the addition of these attributes, which is the Datomic Way (tm).
+ ;;
+ ;; There is, however, a disadvantage for us: the numeric ID must be unique per
+ ;; resource type.  This is how these identifiers were modelled in the
+ ;; Sagittariidae prototype, and we must maintain that in order for the
+ ;; obfuscated IDs to be generated correctly when existing data are imported
+ ;; from the prototype.
+ ;;
+ ;; Although it is possible to achieve that using the technique outlined above,
+ ;; it means allowing duplicate values for the resource ID attribute.
+ ;; Uniqueness of the IDs per resource type must then be enforced by the
+ ;; application.  This is mostly achievable, except if multiple resources of
+ ;; the same type are added in a single transaction.
+ ;;
+ ;; Because it is absolutely critical that we do not duplicate identifiers, it
+ ;; makes sense to enforce this at the lowest possible level: in the DB.  Thus,
+ ;; each resource has `id` and `obfuscated-id` attributes that are specific to
+ ;; its type, on which uniqueness can be enforced.
+
  ;; --- Project
 
  {:db/id          #db/id[:db.part/db]

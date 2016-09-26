@@ -1,0 +1,25 @@
+
+[{:db/id                       #db/id[:db.part/user]
+  :res-archetype/type          :res.type/project
+  :res-archetype/hashid-salt   "sagittarius;Project"
+  :res-archetype/hashid-length 5}
+ {:db/id                       #db/id[:db.part/user]
+  :res-archetype/type          :res.type/method
+  :res-archetype/hashid-salt   "sagittarius;Method"
+  :res-archetype/hashid-length 5}
+ {:db/id                       #db/id[:db.part/user]
+  :res-archetype/type          :res.type/sample
+  :res-archetype/hashid-salt   "sagittarius;Sample"
+  :res-archetype/hashid-length 5}
+ {:db/id                       #db/id[:db.part/user]
+  :res-archetype/type          :res.type/stage
+  :res-archetype/hashid-salt   "sagittarius;SampleStage"
+  :res-archetype/hashid-length 5}
+ {:db/id                       #db/id[:db.part/user]
+  :res-archetype/type          :res.type/stage-token
+  :res-archetype/hashid-salt   "sagittarius;SampleStageToken"
+  :res-archetype/hashid-length 5}
+ {:db/id                       #db/id[:db.part/user]
+  :res-archetype/type          :res.type/datafile
+  :res-archetype/hashid-salt   "sagittarius;SampleStageFile"
+  :res-archetype/hashid-length 5}]
