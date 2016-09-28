@@ -41,7 +41,6 @@
       ;; result each time to raise any exceptions that may have occurred.
       @(d/transact @cn (map (fn [v]
                               (let [m (meta v)]
-
                                 {:db/id    (d/tempid :db.part/user)
                                  :db/doc   (:doc m)
                                  :db/ident (keyword (:name m))
@@ -57,16 +56,9 @@
 
 ;; ------------------------------------------------------------------------- ;;
 
-(defn tx-data:add-resource
-  [rtype attrs]
-  [:christen-resource
-   (merge {:db/id (d/tempid :db.part/user) :res/type rtype} attrs)])
-
-(defn tx
-  [tx-data]
-  (:db-after (d/transact @cn tx-data)))
-
-;; ------------------------------------------------------------------------- ;;
+(defn db
+  []
+  (d/db @cn))
 
 (defn initialize
   []
@@ -74,3 +66,12 @@
    db-uri
    (resource-reader db-schema-file)
    (resource-reader db-initial-data-file)))
+
+(defn tx
+  [tx-data]
+  (:db-after @(d/transact @cn tx-data)))
+
+(defn tx-data:add-resource
+  [rtype attrs]
+  [:christen-resource
+   (merge {:db/id (d/tempid :db.part/user) :res/type rtype} attrs)])

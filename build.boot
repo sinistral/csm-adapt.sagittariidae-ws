@@ -48,9 +48,11 @@
           #{"test"}
           :dependencies
           (dependencies {:build '[[org.clojure/clojure     "1.8.0"]
+                                  [org.clojure/data.json   "0.2.6"]
                                   [com.datomic/datomic-pro "0.9.5350"]
                                   [compojure               "1.5.1"]
                                   [http-kit                "2.1.18"]
+                                  [ring/ring-codec         "1.0.1"]
                                   [ring/ring-core          "1.5.0"]]
                          :test  '[[adzerk/boot-test        "1.1.2"]
                                   [jstrutz/hashids         "1.0.1"]]
@@ -81,6 +83,8 @@
 (deftask dev
   []
   (comp (serve :httpkit true
+               :port    5000
+               :init    'sagittariidae.ws.core/initialize
                :handler 'sagittariidae.ws.core/service-handler
                :nrepl   {})
         (wait)))
