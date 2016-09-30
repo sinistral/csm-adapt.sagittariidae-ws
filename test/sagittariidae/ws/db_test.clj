@@ -5,9 +5,11 @@
             [sagittariidae.ws.db     :as    db]
             [sagittariidae.ws.db-aux :refer [mk-db speculate]]))
 
+(def tx-data:add-resource #'sagittariidae.ws.liaison/tx-data:add-resource)
+
 (deftest test:rename-project
   (let [db1 (-> (mk-db)
-                (speculate [(db/tx-data:add-resource
+                (speculate [(tx-data:add-resource
                              :res.type/project {:project/name "p1"})]))
         en1 (d/entity db1 [:project/name "p1"])
         db2 (speculate db1 [{:db/id (:db/id en1) :project/name "p1.1"}])

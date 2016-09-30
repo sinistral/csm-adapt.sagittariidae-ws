@@ -70,8 +70,3 @@
 (defn tx
   [tx-data]
   (:db-after @(d/transact @cn tx-data)))
-
-(defn tx-data:add-resource
-  [rtype attrs]
-  [:christen-resource
-   (merge {:db/id (d/tempid :db.part/user) :res/type rtype} attrs)])

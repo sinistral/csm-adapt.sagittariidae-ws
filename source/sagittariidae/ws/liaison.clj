@@ -1,8 +1,22 @@
 
 (ns sagittariidae.ws.liaison
-  (:require [clojure.string  :as    s]
-            [datomic.api     :as    d]
-            [ring.util.codec :refer [url-encode]]))
+  "In which is defined the functionality that liaises between the application
+  interface that is exposed by the web service, and the database that maintains
+  the state of the entities managed by the web service."
+  (:require [clojure.string      :as    s]
+            [datomic.api         :as    d]
+            [ring.util.codec     :refer [url-encode]]))
+
+;; ------------------------------------------------------------------------- ;;
+
+(defn- tx-data:add-resource
+  ([rtype attrs]
+   (tx-data:add-resource (d/tempid :db.part/user) rtype attrs))
+  ([eid rtype attrs]
+   [:christen-resource
+    (merge {:db/id eid :res/type rtype} attrs)]))
+
+;; ------------------------------------------------------------------------- ;;
 
 (defn- untype-attrs
   [kvs]

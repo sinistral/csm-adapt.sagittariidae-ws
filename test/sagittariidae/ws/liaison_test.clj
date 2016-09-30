@@ -37,13 +37,15 @@
                                   :thing/attr0         "nil"
                                   :other-thing/attr1   "one"}))))
 
+(def tx-data:add-resource #'l/tx-data:add-resource)
+
 (deftest test:get-projects
   (let [db (-> (mk-db)
-               (speculate [(db/tx-data:add-resource
+               (speculate [(tx-data:add-resource
                             :res.type/project {:project/name "p1"})])
-               (speculate [(db/tx-data:add-resource
+               (speculate [(tx-data:add-resource
                             :res.type/project {:project/name "p2"})])
-               (speculate [(db/tx-data:add-resource
+               (speculate [(tx-data:add-resource
                             :res.type/method {:project/name "m1"})]))]
                                         ; This isn't a legal construction, but
                                         ; it serves to illustrate that we find
@@ -54,11 +56,11 @@
 
 (deftest test:get-methods
   (let [db (-> (mk-db)
-               (speculate [(db/tx-data:add-resource
+               (speculate [(tx-data:add-resource
                             :res.type/project {:method/name "p1"})])
-               (speculate [(db/tx-data:add-resource
+               (speculate [(tx-data:add-resource
                             :res.type/method {:method/name "m1"})])
-               (speculate [(db/tx-data:add-resource
+               (speculate [(tx-data:add-resource
                             :res.type/method {:method/name "m2"})]))]
                                         ; This isn't a legal construction, but
                                         ; it serves to illustrate that we find
