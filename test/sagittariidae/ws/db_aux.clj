@@ -4,12 +4,11 @@
   (:require [datomic.api         :as d]
             [sagittariidae.ws.db :as db]))
 
-(def ^{:private true} db-uri "datomic:mem://sagittariidae-test")
+(def db-uri "datomic:mem://sagittariidae-test")
 
 (defn mk-db
   []
-  (binding [db/db-uri db-uri]
-    (#'db/initialize)))
+  (d/db (db/initialize db-uri)))
 
 (defn speculate
   ([tx]
