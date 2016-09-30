@@ -53,13 +53,13 @@
 (defn get-projects
   [db]
   (map extern-resource-entity
-       (d/q [:find  '[(pull ?e [* {:res/type [:db/ident]}]) ...]
-             :where '[?e :res/type :res.type/project]]
+       (d/q '[:find  [(pull ?e [* {:res/type [:db/ident]}]) ...]
+              :where [?e :res/type :res.type/project]]
             db)))
 
 (defn get-methods
   [db]
   (map extern-resource-entity
-       (d/q [:find  '[(pull ?e [* {:res/type [:db/ident]}]) ...]
-             :where '[?e :res/type :res.type/method]]
+       (d/q '[:find  [(pull ?e [* {:res/type [:db/ident]}]) ...]
+              :where [?e :res/type :res.type/method]]
             db)))
