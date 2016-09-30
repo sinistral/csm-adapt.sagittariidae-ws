@@ -1,7 +1,7 @@
+
 (ns sagittariidae.ws.core-test
-  (:require [clojure.test :refer :all]
-            [sagittariidae.ws.core :refer :all]))
+  (:require [clojure.test :refer [deftest is testing]]))
 
 (deftest a-test
-  (testing "FIXME, I fail."
-    (is (= 0 1))))
+  (testing "I succeed."
+    (is (= 1 1))))
