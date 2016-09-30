@@ -23,7 +23,7 @@
 (def ^{:private true :dynamic true} db-uri
   (str/join "/" [transactor-uri-base db-name]))
 
-(def ^{:private true} cn
+(defonce ^{:private true} conn
   (atom nil))
 
 (defn- dbfns
@@ -35,20 +35,20 @@
 (defn- create-db
   [uri schema data]
   (let [created? (d/create-database uri)]
-    (swap! cn (fn [_] (d/connect uri)))
+    (swap! conn (fn [_] (d/connect uri)))
     (when created?
       ;; Install our database functions, schema and data, dereferencing the
       ;; result each time to raise any exceptions that may have occurred.
-      @(d/transact @cn (map (fn [v]
+      @(d/transact @conn (map (fn [v]
                               (let [m (meta v)]
                                 {:db/id    (d/tempid :db.part/user)
                                  :db/doc   (:doc m)
                                  :db/ident (keyword (:name m))
                                  :db/fn    @v}))
                             (dbfns 'sagittariidae.ws.dbfn)))
-      @(d/transact @cn (read-string (slurp schema)))
-      @(d/transact @cn (read-string (slurp data))))
-    (d/db @cn)))
+      @(d/transact @conn (read-string (slurp schema)))
+      @(d/transact @conn (read-string (slurp data))))
+    (d/db @conn)))
 
 (defn- resource-reader
   [r]
@@ -56,9 +56,13 @@
 
 ;; ------------------------------------------------------------------------- ;;
 
+(defn cn
+  []
+  @conn)
+
 (defn db
   []
-  (d/db @cn))
+  (d/db @conn))
 
 (defn initialize
   []
@@ -68,5 +72,7 @@
    (resource-reader db-initial-data-file)))
 
 (defn tx
-  [tx-data]
-  (:db-after @(d/transact @cn tx-data)))
+  ([tx-data]
+   (tx @conn tx-data))
+  ([cn tx-data]
+   (:db-after @(d/transact cn tx-data))))
