@@ -101,6 +101,14 @@
   expression against which a sample name must successfully match."
   :db.install/_attribute :db.part/db}
 
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :project/sample
+  :db/valueType   :db.type/ref
+  :db/cardinality :db.cardinality/many
+  :db/doc "The samples that have undergone testing in the name of this
+  project."
+  :db.install/_attribute :db.part/db}
+
  ;; --- Sample
 
  {:db/id          #db/id[:db.part/db]
@@ -129,7 +137,8 @@
   :db/cardinality :db.cardinality/one
   :db/unique      :db.unique/value
   :db/doc "The name of the sample, codified according to the project
-  requirements, and mask."
+  requirements, and mask, qualified by the ID of the project to which it
+  belongs."
   :db.install/_attribute :db.part/db}
 
  {:db/id          #db/id[:db.part/db]
