@@ -157,6 +157,11 @@
 
 (deftest test:get-sample
   (let [db (as-> (mk-db) db (speculate db (tx-data:add-project db "p1" ".*")))
-        pn (:project/obfuscated-id (find-by-name db :project "p1"))
-        db (speculate db (tx-data:add-sample db pn "s1"))]
-    (is (= {:name "s1", :id "OQn6Q-s1"} (<>/get-sample db pn "s1")))))
+        pi (:project/obfuscated-id (find-by-name db :project "p1"))
+        db (speculate db (tx-data:add-sample db pi "s1"))]
+    (testing "one sample"
+      (is (= {:name "s1", :id "OQn6Q-s1"}
+             (<>/get-sample db pi (:sample/obfuscated-id
+                                   (find-by-name db :sample (#'<>/mk-sample-name pi "s1")))))))
+    (testing "no sample"
+      (is (nil? (<>/get-sample db pi "..."))))))

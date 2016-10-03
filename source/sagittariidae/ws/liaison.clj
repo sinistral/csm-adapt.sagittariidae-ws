@@ -6,7 +6,6 @@
   (:require [clojure.string      :as    s]
             [datomic.api         :as    d]
             [ring.util.codec     :refer [url-encode]]
-            [mantle.core         :refer [single]]
             [mantle.io           :refer [fmtstr]]
             [sagittariidae.ws.db :refer [tx]]
             [swiss.arrows        :refer :all]))
@@ -160,12 +159,11 @@
   (tx cn (tx-data:add-sample (d/db cn) project-id sample-name)))
 
 (defn get-sample
-  "Retrieve the named sample.  Sample names are qualified by their project, and
-  the (obfuscated) project ID is therefore a required argument."
-  [db project-id sample-name]
-  (extern-resource-entity
-   (single
-    (d/q '[:find  [(pull ?e [* {:res/type [:db/ident]}])]
-           :in    $ ?n
-           :where [?e :sample/name ?n]]
-         db (mk-sample-name project-id sample-name)))))
+  [db project-id sample-id]
+  (when-let [es (d/q '[:find  [(pull ?s [* {:res/type [:db/ident]}])]
+                       :in    $ ?p-id ?s-id
+                       :where [?e :sample/obfuscated-id ?s-id]
+                              [?p :project/obfuscated-id ?p-id]
+                              [?p :project/sample ?s]]
+                     db project-id sample-id)]
+    (extern-resource-entity (first es))))
