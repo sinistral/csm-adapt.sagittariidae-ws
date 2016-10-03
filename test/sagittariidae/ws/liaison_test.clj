@@ -35,7 +35,8 @@
 
 (deftest test:extern-resource-entity
   (is (= {:id "f00-bar" :name "Bar" :attr0 "nil" :attr1 "one"}
-         (extern-resource-entity {:thing/id            0
+         (extern-resource-entity {:res/type            {:db/ident :res.type/thing}
+                                  :thing/id            0
                                   :thing/obfuscated-id "f00"
                                   :thing/name          "Bar"
                                   :thing/attr0         "nil"
@@ -153,3 +154,9 @@
                      (speculate db (tx-data:add-project db "p1" #"s-\d")))
                 pn (:project/obfuscated-id (find-by-name db :project "p1"))]
             (speculate db (tx-data:add-sample db pn "s-a")))))))
+
+(deftest test:get-sample
+  (let [db (as-> (mk-db) db (speculate db (tx-data:add-project db "p1" ".*")))
+        pn (:project/obfuscated-id (find-by-name db :project "p1"))
+        db (speculate db (tx-data:add-sample db pn "s1"))]
+    (is (= {:name "s1", :id "OQn6Q-s1"} (<>/get-sample db pn "s1")))))

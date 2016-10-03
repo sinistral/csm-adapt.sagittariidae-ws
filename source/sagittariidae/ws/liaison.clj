@@ -6,8 +6,10 @@
   (:require [clojure.string      :as    s]
             [datomic.api         :as    d]
             [ring.util.codec     :refer [url-encode]]
+            [mantle.core         :refer [single]]
             [mantle.io           :refer [fmtstr]]
-            [sagittariidae.ws.db :refer [tx]]))
+            [sagittariidae.ws.db :refer [tx]]
+            [swiss.arrows        :refer :all]))
 
 ;;; ----------------------------------------------------------------------- ;;;
 
@@ -84,15 +86,17 @@
   [kvs]
   (map #(let [[k v] %] [(-> k name keyword) v]) kvs))
 
+(defn- unqual-name
+  [x]
+  (last (s/split x #"\$")))
+
 (defn- extern-name
   [x]
   (letfn [(esc->- [x]
             (s/replace x #"%.{2}|\/|_" "-"))
           (shrink [x]
-            (s/replace x #"-{2,}" "-"))
-          (unqual [x]
-            (last (s/split x #"\$")))]
-    (-> x unqual s/lower-case url-encode esc->- shrink)))
+            (s/replace x #"-{2,}" "-"))]
+    (-> x unqual-name s/lower-case url-encode esc->- shrink)))
 
 (defn- extern-id
   [m]
@@ -107,12 +111,21 @@
   stripping out implementation-specific fields and replacing internal
   identifiers with the values that we want the outside world to see."
   [x]
-  (let [kvs (-> x
-                (dissoc :db/id :res/type)
-                (seq)
-                (untype-attrs)
-                (flatten))]
-    (extern-id (apply hash-map kvs))))
+  (assert (-> x :res/type :db/ident) "Type entity has not been expanded; did you forget to expand this in a `pull` expression?")
+  (let [ext-name (unqual-name
+                  ((-> x
+                       :res/type                  ; construct the name of
+                       :db/ident                  ; the `name` attribute of
+                       name                       ; the entity, and fetch it
+                       (#(s/join "/" [% "name"])) ; e.g. `(:project/name x)`
+                       keyword) x))]
+    (extern-id (-<> x
+                    (dissoc :db/id :res/type)
+                    seq
+                    untype-attrs
+                    flatten
+                    (apply hash-map <>)
+                    (assoc :name ext-name)))))
 
 (defn- mk-sample-name
   [project-id sample-name]
@@ -145,3 +158,14 @@
 (defn add-sample
   [cn project-id sample-name]
   (tx cn (tx-data:add-sample (d/db cn) project-id sample-name)))
+
+(defn get-sample
+  "Retrieve the named sample.  Sample names are qualified by their project, and
+  the (obfuscated) project ID is therefore a required argument."
+  [db project-id sample-name]
+  (extern-resource-entity
+   (single
+    (d/q '[:find  [(pull ?e [* {:res/type [:db/ident]}])]
+           :in    $ ?n
+           :where [?e :sample/name ?n]]
+         db (mk-sample-name project-id sample-name)))))
