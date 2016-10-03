@@ -32,6 +32,16 @@
   [ns-sym]
   (filter #(:dbfn (meta %)) (vals (ns-interns (find-ns ns-sym)))))
 
+(defn- install-dbfns
+  [cn ns]
+  (d/transact cn (map (fn [v]
+                        (let [m (meta v)]
+                          {:db/id    (d/tempid :db.part/user)
+                           :db/doc   (:doc m)
+                           :db/ident (keyword (:name m))
+                           :db/fn    @v}))
+                      (dbfns ns))))
+
 (defn- create-db
   [uri schema data]
   (let [created? (d/create-database uri)
@@ -39,13 +49,7 @@
     (when created?
       ;; Install our database functions, schema and data, dereferencing the
       ;; result each time to raise any exceptions that may have occurred.
-      @(d/transact cn (map (fn [v]
-                             (let [m (meta v)]
-                               {:db/id    (d/tempid :db.part/user)
-                                :db/doc   (:doc m)
-                                :db/ident (keyword (:name m))
-                                :db/fn    @v}))
-                           (dbfns 'sagittariidae.ws.dbfn)))
+      @(install-dbfns cn 'sagittariidae.ws.dbfn)
       @(d/transact cn (read-string (slurp schema)))
       @(d/transact cn (read-string (slurp data))))
     cn))
@@ -87,6 +91,6 @@
 
 (defn tx
   ([tx-data]
-   (tx @conn tx-data))
+   (tx (cn) tx-data))
   ([cn tx-data]
    (:db-after @(d/transact cn tx-data))))
