@@ -54,7 +54,8 @@
                                   [http-kit                "2.1.18"]
                                   [ring/ring-codec         "1.0.1"]
                                   [ring/ring-core          "1.5.0"]
-                                  [sinistral/mantle        "0.3.0"]]
+                                  [sinistral/mantle        "0.3.0"]
+                                  [swiss-arrows            "1.0.0"]]
                          :test  '[[adzerk/boot-test        "1.1.2"]
                                   [jstrutz/hashids         "1.0.1"]]
                          :dev   '[[org.clojure/tools.nrepl "0.2.10"]
@@ -76,10 +77,7 @@
  jar {:main        'sagittariidae.ws.core
       :file        (str "sagittariidae-ws-" version "-standalone.jar")})
 
-(require '[boot.repl
-           :refer [*default-dependencies*]]
-         '[pandeiro.boot-http
-           :refer [serve]])
+(require '[pandeiro.boot-http :refer [serve]])
 
 (deftask dev
   []

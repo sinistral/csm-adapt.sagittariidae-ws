@@ -39,6 +39,14 @@
    [[:christen-resource
      (merge {:db/id eid :res/type rtype} attrs)]]))
 
+(defn- tx-data:add-annotation
+  ([[k v :as a]]
+   (tx-data:add-annotation (d/tempid :db.part/user) a))
+  ([eid [k v]]
+   [{:db/id        eid
+     :annotation/k k
+     :annotation/v v}]))
+
 (defn- tx-data:add-project
   [db name mask]
   (tx-data:add-resource
@@ -64,7 +72,8 @@
                  (*resource-not-found* :res.type/project project-id))
         name (or (re-matches (re-pattern mask) sample-name)
                  (*malformed-sample-name* sample-name mask))]
-    (let [eid (d/tempid :db.part/user)]
+    (let [sample-eid  (d/tempid :db.part/user)
+          sample-attr {:sample/name (mk-sample-name project-id sample-name)}]
       ;; We require sample names to be unique within a project.  In a
       ;; relational database we'd achieve this by creating a UNIQUE index on
       ;; (project-id, sample-id).  Although it is possible to enforce this in
@@ -73,11 +82,24 @@
       ;; across all instances of the `:sample/name` attribute, so we
       ;; concatenate the sample name to the project name to obtain the desired
       ;; behaviour.
-      (conj (tx-data:add-resource
-             eid
-             :res.type/sample {:sample/name (mk-sample-name project-id sample-name)})
+      (conj (tx-data:add-resource sample-eid :res.type/sample sample-attr)
             {:db/id          [:project/obfuscated-id project-id]
-             :project/sample eid}))))
+             :project/sample sample-eid}))))
+
+(defn- tx-data:add-stage
+  [db sample-id method-id annotations]
+  (let [stg-eid   (d/tempid :db.part/user)
+        ann-eids  (repeatedly (count annotations) #(d/tempid :db.part/user))
+        stg-attrs {:stage/method     [:method/obfuscated-id method-id]
+                   :stage/annotation (apply hash-set ann-eids)}]
+    (concat
+     ;; build the annotation entities
+     (mapcat tx-data:add-annotation ann-eids (seq annotations))
+     ;; txform for the stage resource
+     (tx-data:add-resource stg-eid :res.type/stage stg-attrs)
+     ;; link the stage to the sample
+     [{:db/id [:sample/obfuscated-id sample-id]
+       :sample/stage stg-eid}])))
 
 ;;; ----------------------------------------------------------------------- ;;;
 
@@ -167,3 +189,7 @@
                               [?p :project/sample ?s]]
                      db project-id sample-id)]
     (extern-resource-entity (first es))))
+
+(defn add-stage
+  [cn project-id sample-id method-id annotations]
+  (tx cn (tx-data:add-stage (d/db cn) sample-id method-id annotations)))

@@ -154,3 +154,44 @@
              (<>/get-sample db pi (name->obid db :sample (#'<>/mk-sample-name pi "s1"))))))
     (testing "no sample"
       (is (nil? (<>/get-sample db pi "..."))))))
+
+(defn- prepare-db:add-stage
+  []
+  (let [db (as-> (mk-db) db (speculate db (#'<>/tx-data:add-project db "p1" ".*")))
+        p1 (name->obid db :project "p1")
+        db (speculate db (#'<>/tx-data:add-method db "m1" ""))
+        m1 (name->obid db :method "m1")
+        db (speculate db (#'<>/tx-data:add-sample db p1 "s1"))
+        s1 (name->obid db :sample (#'<>/mk-sample-name p1 "s1"))]
+    {:db db :p1 p1 :m1 m1 :s1 s1}))
+
+(deftest test:add-stage
+  (testing "no annotations"
+    (let [{:keys [db m1 s1]} (prepare-db:add-stage)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {}))]
+      (is (= [{:stage/obfuscated-id "Drn1Q"
+               :stage/method {:method/obfuscated-id "XZOQ0"}}]
+             (d/q '[:find  [(pull ?e [:stage/obfuscated-id
+                                      {:stage/method [:method/obfuscated-id]}
+                                      :stage/annotation])]
+                    :where [?e :stage/obfuscated-id]]
+                  db)))))
+  (testing "multiple annotations"
+    (let [{:keys [db m1 s1]} (prepare-db:add-stage)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {"k1" "v1" "k2" "v2"}))]
+      (is (= [{:stage/obfuscated-id "Drn1Q"
+               :stage/method {:method/obfuscated-id "XZOQ0"}
+               :stage/annotation [{:annotation/k "k1" :annotation/v "v1"}
+                                  {:annotation/k "k2" :annotation/v "v2"}]}]
+             (d/q '[:find  [(pull ?e [:stage/obfuscated-id
+                                      {:stage/method [:method/obfuscated-id]}
+                                      {:stage/annotation [:annotation/k :annotation/v]}])]
+                    :where [?e :stage/obfuscated-id]]
+                  db)))))
+  (testing "stage is associated with a sample"
+    (let [{:keys [db m1 s1]} (prepare-db:add-stage)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {}))]
+      (is (= [{:sample/obfuscated-id "OQn6Q"}]
+             (d/q '[:find  [(pull ?sample [:sample/obfuscated-id])]
+                    :where [?sample :sample/stage]]
+                  db))))))

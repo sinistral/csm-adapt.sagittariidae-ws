@@ -143,7 +143,7 @@
 
  {:db/id          #db/id[:db.part/db]
   :db/ident       :sample/stage
-  :db/valueType   :db.type/ref ;; references :stage
+  :db/valueType   :db.type/ref ; references :stage
   :db/cardinality :db.cardinality/many
   :db/doc "The stages of a sample's lifecycle."
   :db.install/_attribute :db.part/db}
@@ -213,8 +213,16 @@
   :db.install/_attribute :db.part/db}
 
  {:db/id          #db/id[:db.part/db]
+  :db/ident       :stage/method
+  :db/valueType   :db.type/ref ; references :method
+  :db/cardinality :db.cardinality/one
+  :db/doc "The test or analysis method that has been applied to the sample
+  during this stage."
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
   :db/ident       :stage/annotation
-  :db/valueType   :db.type/ref ;; references :annotation
+  :db/valueType   :db.type/ref ; references :annotation
   :db/cardinality :db.cardinality/many
   :db/doc "An annotation (essentially a tag) associated with the stage.
   Typically used to capture metadata (such as process parameters) that may
@@ -224,7 +232,7 @@
 
  {:db/id          #db/id[:db.part/db]
   :db/ident       :stage/datafile
-  :db/valueType   :db.type/ref ;; references :datafile
+  :db/valueType   :db.type/ref ; references :datafile
   :db/cardinality :db.cardinality/many
   :db/doc "A datafile associated with the stage.  These files may contain the
   results of the experiment, data collected during the process, or other
@@ -258,7 +266,7 @@
 
  {:db/id          #db/id[:db.part/db]
   :db/ident       :datafile/state
-  :db/valueType   :db.type/ref ;; references: datafile.state
+  :db/valueType   :db.type/ref ; references: datafile.state
   :db/cardinality :db.cardinality/one
   :db/doc "Data files have a well-defined lifecycle, from being uploaded,
   though validation, until they are archived as part of the permament record
@@ -268,12 +276,17 @@
  [:db/add #db/id[:db.part/user] :db/ident :datafile.state/staged]
  [:db/add #db/id[:db.part/user] :db/ident :datafile.state/archived]
 
- ;; --- Stage annotation
+ ;; --- Annotation
 
  {:db/id          #db/id[:db.part/db]
-  :db/ident       :annotation/tag
+  :db/ident       :annotation/k
   :db/valueType   :db.type/string
-  :db/unique      :db.unique/identity
+  :db/cardinality :db.cardinality/one
+  :db.install/_attribute :db.part/db}
+
+ {:db/id          #db/id[:db.part/db]
+  :db/ident       :annotation/v
+  :db/valueType   :db.type/string
   :db/cardinality :db.cardinality/one
   :db.install/_attribute :db.part/db}
 
