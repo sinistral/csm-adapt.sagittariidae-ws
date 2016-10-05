@@ -4,6 +4,7 @@
   interface that is exposed by the web service, and the database that maintains
   the state of the entities managed by the web service."
   (:require [clojure.string      :as    s]
+            [clojure.walk        :refer [prewalk]]
             [datomic.api         :as    d]
             [ring.util.codec     :refer [url-encode]]
             [mantle.io           :refer [fmtstr]]
@@ -103,9 +104,19 @@
 
 ;;; ----------------------------------------------------------------------- ;;;
 
-(defn- untype-attrs
+(defmulti ^{:private true} untype-attrs
+  #(cond (map? %) :map
+         (sequential? %) :seq))
+
+(defmethod ^{:private true} untype-attrs :seq
   [kvs]
   (map #(let [[k v] %] [(-> k name keyword) v]) kvs))
+
+(defmethod ^{:private true} untype-attrs :map
+  [m]
+  (if (seq m)                           ; handle empty maps
+    (-<> m seq untype-attrs (apply concat <>) (apply hash-map <>))
+    m))
 
 (defn- unqual-name
   [x]
@@ -132,7 +143,7 @@
   stripping out implementation-specific fields and replacing internal
   identifiers with the values that we want the outside world to see."
   [x]
-  (assert (-> x :res/type :db/ident) "Type entity has not been expanded; did you forget to expand this in a `pull` expression?")
+  (assert (-> x :res/type :db/ident) "Type entity for attribute has not been expanded; did you forget to expand this in a `pull` expression?")
   (let [ext-name (unqual-name
                   ((-> x
                        :res/type                  ; construct the name of
@@ -142,11 +153,22 @@
                        keyword) x))]
     (extern-id (-<> x
                     (dissoc :db/id :res/type)
-                    seq
-                    untype-attrs
-                    flatten
-                    (apply hash-map <>)
+                    (untype-attrs)
                     (assoc :name ext-name)))))
+
+(defn- extern-entity
+  "Helper function to eternalise Sagittariidae Datomic entities.  Intended for
+  use with `clojure.walk/prewalk` to recursively process structures."
+  [e]
+  (cond (and (map? e) (contains? e :res/type))
+        (extern-resource-entity e)
+        (map? e)
+        (untype-attrs (dissoc e :db/id))
+        :else e))
+
+(defn- externalize
+  [x]
+  (prewalk extern-entity x))
 
 (defn- mk-sample-name
   [project-id sample-name]
@@ -160,10 +182,14 @@
 
 (defn get-projects
   [db]
-  (map extern-resource-entity
-       (d/q '[:find  [(pull ?e [* {:res/type [:db/ident]}]) ...]
-              :where [?e :res/type :res.type/project]]
-            db)))
+  (externalize
+   (d/q '[:find  [(pull ?e [:project/id
+                            :project/obfuscated-id
+                            :project/name
+                            :project/sample-mask
+                            {:res/type [:db/ident]}]) ...]
+          :where [?e :res/type :res.type/project]]
+        db)))
 
 (defn add-method
   [cn name desc]
@@ -171,10 +197,14 @@
 
 (defn get-methods
   [db]
-  (map extern-resource-entity
-       (d/q '[:find  [(pull ?e [* {:res/type [:db/ident]}]) ...]
-              :where [?e :res/type :res.type/method]]
-            db)))
+  (externalize
+   (d/q '[:find  [(pull ?e [:method/id
+                            :method/obfuscated-id
+                            :method/name
+                            :method/description
+                            {:res/type [:db/ident]}]) ...]
+          :where [?e :res/type :res.type/method]]
+        db)))
 
 (defn add-sample
   [cn project-id sample-name]
@@ -182,13 +212,18 @@
 
 (defn get-sample
   [db project-id sample-id]
-  (when-let [es (d/q '[:find  [(pull ?s [* {:res/type [:db/ident]}])]
-                       :in    $ ?p-id ?s-id
-                       :where [?e :sample/obfuscated-id ?s-id]
-                              [?p :project/obfuscated-id ?p-id]
-                              [?p :project/sample ?s]]
-                     db project-id sample-id)]
-    (extern-resource-entity (first es))))
+  (let [query '[:find  [(pull ?s [* {:res/type [:db/ident]
+                                     :sample/stage [{:stage/method [{:res/type [:db/ident]}
+                                                                    :method/id
+                                                                    :method/obfuscated-id
+                                                                    :method/name]}
+                                                    {:stage/annotation [:annotation/k :annotation/v]}]}])]
+                :in    $ ?p-id ?s-id
+                :where [?e :sample/obfuscated-id ?s-id]
+                [?p :project/obfuscated-id ?p-id]
+                [?p :project/sample ?s]]]
+    (when-let [es (d/q query db project-id sample-id)]
+      (externalize (first es)))))
 
 (defn add-stage
   [cn project-id sample-id method-id annotations]

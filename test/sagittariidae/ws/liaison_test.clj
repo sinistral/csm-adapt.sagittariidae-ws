@@ -195,3 +195,16 @@
              (d/q '[:find  [(pull ?sample [:sample/obfuscated-id])]
                     :where [?sample :sample/stage]]
                   db))))))
+
+(deftest test:get-sample-with-stage
+  (testing "no stage key present when no stages"
+    (let [{:keys [db p1 m1 s1]} (prepare-db:add-stage)]
+      (is (nil? (:stage (<>/get-sample db p1 s1))))))
+  (testing "stage is included when available"
+    (let [{:keys [db p1 m1 s1]} (prepare-db:add-stage)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {"k1" "v1"}))
+          rs (<>/get-sample db p1 s1)]
+      (is (= 1 (count (:stage rs))))
+      (is (reduce (fn [x y] (and x y))
+                  (map (fn [k] (contains? (first (:stage rs)) k))
+                       [:method :annotation]))))))
