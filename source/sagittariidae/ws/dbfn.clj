@@ -2,9 +2,19 @@
 (ns sagittariidae.ws.dbfn
   "In which are defined functions that will be exected within the Datomic
   transactor; cf http://docs.datomic.com/database-functions.html"
-  (:require datomic.function))
+  (:require [datomic.api :as d]))
 
-(def ^{:private true :dbfn true} christen-resource
+(defmacro ^{:private true} defdbfn
+  [fname doc-string opts args & body]
+  (let [reqs (or (:requires opts) [])]
+    `(def ~(vary-meta fname assoc :private true :dbfn true)
+       ~doc-string
+       (d/function {:lang     :clojure
+                    :requires (quote ~reqs)
+                    :params   (quote ~args)
+                    :code     (quote (do ~@body))}))))
+
+(defdbfn christen-resource
   "Assign an external identity to a new resource.  By this name shall it be
   known to agents beyond the Sagittariidae API."
   ;; The downside to allocating the primary identifier in a transaction
@@ -18,40 +28,39 @@
   ;; prevent it and to prevent Datomic's 'upsert' functionality from folding
   ;; what should be the addition of a new resource into an update of an
   ;; existing resource.
-  #db/fn {:lang :clojure
-          :requires [[clojure.string :as str]
-                     [datomic.api :refer [entity q]]
-                     [hashids.core :refer [encode]]]
-          :params [db m]
-          :code   (let [e-type (:res/type m)
-                        [n-attr o-attr] (map
-                                         #(keyword (str/join "/" [(name e-type) %]))
-                                         ["id" "obfuscated-id"])
-                        idopts (zipmap
-                                [:salt :min-length]
-                                (first
-                                 (q '[:find  ?s ?l
-                                      :in    $ ?t
-                                      :where [?e :res-archetype/type ?t]
-                                             [?e :res-archetype/hashid-salt ?s]
-                                             [?e :res-archetype/hashid-length ?l]]
-                                    db e-type)))
-                        max-id (ffirst
-                                (q '[:find  (max ?n)
-                                     :in    $ ?t ?a
-                                     :where [?e :res/type ?t]
-                                            [?e ?a ?n]]
-                                   db e-type n-attr))
-                        new-id (inc (or max-id 0))]
-                    ;; FIXIT: It must not be possible to explicitly set either
-                    ;; the `id` or the `obfuscated-id`, and these must not
-                    ;; already be set.  We can (and do) override them, but it
-                    ;; may be confusing to the user to an entity created with
-                    ;; different IDs.  Better to fail-fast (since in this case
-                    ;; its actually a programming error).
-                    [(merge m {:db/id (:db/id m)
-                               n-attr (biginteger new-id) ; [1]
-                               o-attr (encode idopts new-id)})])})
+  {:requires [[clojure.string :as str]
+              [datomic.api :refer [entity q]]
+              [hashids.core :refer [encode]]]}
+  [db m]
+  (let [e-type (:res/type m)
+        [n-attr o-attr] (map
+                         #(keyword (str/join "/" [(name e-type) %]))
+                         ["id" "obfuscated-id"])
+        idopts (zipmap
+                [:salt :min-length]
+                (first
+                 (q '[:find  ?s ?l
+                      :in    $ ?t
+                      :where [?e :res-archetype/type ?t]
+                             [?e :res-archetype/hashid-salt ?s]
+                             [?e :res-archetype/hashid-length ?l]]
+                    db e-type)))
+        max-id (ffirst
+                (q '[:find  (max ?n)
+                     :in    $ ?t ?a
+                     :where [?e :res/type ?t]
+                            [?e ?a ?n]]
+                   db e-type n-attr))
+        new-id (inc (or max-id 0))]
+    ;; FIXIT: It must not be possible to explicitly set either
+    ;; the `id` or the `obfuscated-id`, and these must not
+    ;; already be set.  We can (and do) override them, but it
+    ;; may be confusing to the user to an entity created with
+    ;; different IDs.  Better to fail-fast (since in this case
+    ;; its actually a programming error).
+    [(merge m {:db/id (:db/id m)
+               n-attr (biginteger new-id) ; [1]
+               o-attr (encode idopts new-id)})]))
 
 ;; [1] We shouldn't need to do this, but there's a bug in Datomic's
 ;;     serialisation of Clojure's BigInt type.
