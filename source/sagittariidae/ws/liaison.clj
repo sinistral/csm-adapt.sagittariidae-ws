@@ -3,7 +3,8 @@
   "In which is defined the functionality that liaises between the application
   interface that is exposed by the web service, and the database that maintains
   the state of the entities managed by the web service."
-  (:require [clojure.string      :as    s]
+  (:require [backtick            :refer [template]]
+            [clojure.string      :as    s]
             [clojure.walk        :refer [prewalk]]
             [datomic.api         :as    d]
             [ring.util.codec     :refer [url-encode]]
@@ -211,19 +212,26 @@
   (tx cn (tx-data:add-sample (d/db cn) project-id sample-name)))
 
 (defn get-sample
-  [db project-id sample-id]
-  (let [query '[:find  [(pull ?s [* {:res/type [:db/ident]
-                                     :sample/stage [{:stage/method [{:res/type [:db/ident]}
-                                                                    :method/id
-                                                                    :method/obfuscated-id
-                                                                    :method/name]}
-                                                    {:stage/annotation [:annotation/k :annotation/v]}]}])]
-                :in    $ ?p-id ?s-id
-                :where [?e :sample/obfuscated-id ?s-id]
-                [?p :project/obfuscated-id ?p-id]
-                [?p :project/sample ?s]]]
-    (when-let [es (d/q query db project-id sample-id)]
-      (externalize (first es)))))
+  ([db sample-id]
+   (get-sample db nil sample-id))
+  ([db project-id sample-id]
+   (let [q (template
+            [:find  [(pull ?s [* {:res/type [:db/ident]
+                                  :sample/stage [{:stage/method [{:res/type [:db/ident]}
+                                                                 :method/id
+                                                                 :method/obfuscated-id
+                                                                 :method/name]}
+                                                 {:stage/annotation [:annotation/k :annotation/v]}]}])]
+             :in    ~@(keep identity ['$ (when project-id '?p-id) '?s-id])
+             :where ~@(let [base '[[?s :sample/obfuscated-id ?s-id]]]
+                        (if project-id
+                          (conj base
+                                '[?p :project/obfuscated-id ?p-id]
+                                '[?p :project/sample ?s])
+                          base))])
+         a (keep identity [q db project-id sample-id])]
+     (when-let [es (apply d/q a)]
+       (externalize (first es))))))
 
 (defn add-stage
   [cn project-id sample-id method-id annotations]

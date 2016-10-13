@@ -153,7 +153,15 @@
       (is (= {:name "s1", :id "OQn6Q-s1"}
              (<>/get-sample db pi (name->obid db :sample (#'<>/mk-sample-name pi "s1"))))))
     (testing "no sample"
-      (is (nil? (<>/get-sample db pi "..."))))))
+      (is (nil? (<>/get-sample db pi "..."))))
+    (testing "project ID mismatch"
+      (is (nil? (<>/get-sample db "..." (name->obid db :sample (#'<>/mk-sample-name pi "s1"))))))
+    (testing "sample for project"
+      (let [db (speculate db (#'<>/tx-data:add-project db "p2" ".*"))
+            p2 (name->obid db :project "p2")
+            db (speculate db (#'<>/tx-data:add-sample db p2 "s2"))]
+        (is (= {:name "s1", :id "OQn6Q-s1"}
+               (<>/get-sample db pi (name->obid db :sample (#'<>/mk-sample-name pi "s1")))))))))
 
 (defn- prepare-db:add-stage
   []

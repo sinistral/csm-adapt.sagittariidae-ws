@@ -49,6 +49,7 @@
           :dependencies
           (dependencies {:build '[[org.clojure/clojure     "1.8.0"]
                                   [org.clojure/data.json   "0.2.6"]
+                                  [backtick                "0.3.3"]
                                   [com.datomic/datomic-pro "0.9.5350"]
                                   [compojure               "1.5.1"]
                                   [http-kit                "2.1.18"]
