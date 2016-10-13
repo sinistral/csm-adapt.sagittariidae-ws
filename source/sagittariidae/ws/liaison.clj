@@ -131,10 +131,27 @@
             (s/replace x #"-{2,}" "-"))]
     (-> x unqual-name s/lower-case url-encode esc->- shrink)))
 
+(defn- rn->id
+  "Convert a \"resource-name\" into an ID. To make resource IDs more readable,
+  we return them with a sanitized version of the name appended.  Clients are
+  allowed to use the entire string as an identifier so we must be able to undo
+  our own ID munging."
+  [x]
+  (-> x (s/split #"-" 2) (first)))
+
+(defn- id->rn
+  "Construct a human-grokkable label for a resource, a \"resource name\".  This
+  name still uniquely identifies the resource, but includes some context that
+  makes the label more meaningful to humans."
+  [id nm]
+  (s/join "-" [id nm]))
+
 (defn- extern-id
+  "To make IDs grokkable to humans, append a sanitized version of the name to
+  construct a \"resource name\"."
   [m]
   (dissoc (if-let [name (:name m)]
-            (assoc m :id (s/join "-" [(:obfuscated-id m) (extern-name name)]))
+            (assoc m :id (id->rn (:obfuscated-id m) (extern-name name)))
             (assoc m :id (:obfuscated-id m)))
           :obfuscated-id))
 
@@ -209,7 +226,7 @@
 
 (defn add-sample
   [cn project-id sample-name]
-  (tx cn (tx-data:add-sample (d/db cn) project-id sample-name)))
+  (tx cn (tx-data:add-sample (d/db cn) (rn->id project-id) sample-name)))
 
 (defn get-sample
   ([db sample-id]
@@ -229,10 +246,10 @@
                                 '[?p :project/obfuscated-id ?p-id]
                                 '[?p :project/sample ?s])
                           base))])
-         a (keep identity [q db project-id sample-id])]
+         a (keep identity [q db project-id (rn->id sample-id)])]
      (when-let [es (apply d/q a)]
        (externalize (first es))))))
 
 (defn add-stage
   [cn project-id sample-id method-id annotations]
-  (tx cn (tx-data:add-stage (d/db cn) sample-id method-id annotations)))
+  (tx cn (tx-data:add-stage (d/db cn) (rn->id sample-id) (rn->id method-id) annotations)))
