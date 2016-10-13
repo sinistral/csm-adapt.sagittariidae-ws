@@ -194,6 +194,14 @@
 
 ;;; ----------------------------------------------------------------------- ;;;
 
+(def ^{:private true} pull-specs
+  {:sample '[* {:res/type [:db/ident]
+                :sample/stage [{:stage/method [{:res/type [:db/ident]}
+                                               :method/id
+                                               :method/obfuscated-id
+                                               :method/name]}
+                               {:stage/annotation [:annotation/k :annotation/v]}]}]})
+
 (defn add-project
   [cn name mask]
   (tx cn (tx-data:add-project (d/db cn) name mask)))
@@ -233,12 +241,7 @@
    (get-sample db nil sample-id))
   ([db project-id sample-id]
    (let [q (template
-            [:find  [(pull ?s [* {:res/type [:db/ident]
-                                  :sample/stage [{:stage/method [{:res/type [:db/ident]}
-                                                                 :method/id
-                                                                 :method/obfuscated-id
-                                                                 :method/name]}
-                                                 {:stage/annotation [:annotation/k :annotation/v]}]}])]
+            [:find  [(pull ?s ~(:sample pull-specs))]
              :in    ~@(keep identity ['$ (when project-id '?p-id) '?s-id])
              :where ~@(let [base '[[?s :sample/obfuscated-id ?s-id]]]
                         (if project-id
@@ -249,6 +252,15 @@
          a (keep identity [q db project-id (rn->id sample-id)])]
      (when-let [es (apply d/q a)]
        (externalize (first es))))))
+
+(defn get-samples
+  [db project-id]
+  (externalize (d/q (template
+                     [:find  [(pull ?s ~(:sample pull-specs)) ...]
+                      :in    $ ?p-id
+                      :where [?p :project/obfuscated-id ?p-id]
+                      [?p :project/sample ?s]])
+                    db (rn->id project-id))))
 
 (defn add-stage
   [cn project-id sample-id method-id annotations]

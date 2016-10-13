@@ -16,7 +16,9 @@
   (GET "/methods" []
        (json/write-str (<>/get-methods (db))))
   (GET "/projects/:p/samples" [p q]
-       (json/write-str {:p p :q (s/split q #" ")}))
+       (if (empty? q)
+         (json/write-str (<>/get-samples (db) p))
+         (throw UnsupportedOperationException)))
   (GET "/projects/:p/samples/:s" [p s]
        (if-let [r (<>/get-sample (db) p s)]
          (json/write-str r)
