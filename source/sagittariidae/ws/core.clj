@@ -23,6 +23,8 @@
        (if-let [r (<>/get-sample (db) p s)]
          (json/write-str r)
          (not-found (json/write-str {:project/id p :sample/id s}))))
+  (GET "/projects/:p/samples/:s/stages" [p s]
+       (json/write-str {:sample s :stages (<>/get-stages (db) p s)}))
   ;; Routes for static files and error handlers.
   (files "/" {:root "site"})
   (not-found "404"))

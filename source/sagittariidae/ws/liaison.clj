@@ -34,6 +34,10 @@
     {:name    name
      :pattern re})))
 
+(defn- mk-sample-name
+  [project-id sample-name]
+  (s/join "$" [project-id sample-name]))
+
 (defn- tx-data:add-resource
   ([rtype attrs]
    (tx-data:add-resource (d/tempid :db.part/user) rtype attrs))
@@ -121,7 +125,8 @@
 
 (defn- unqual-name
   [x]
-  (last (s/split x #"\$")))
+  (when x
+    (last (s/split x #"\$"))))
 
 (defn- extern-name
   [x]
@@ -146,7 +151,7 @@
   [id nm]
   (s/join "-" [id nm]))
 
-(defn- extern-id
+(defn- extern-id-in-resource
   "To make IDs grokkable to humans, append a sanitized version of the name to
   construct a \"resource name\"."
   [m]
@@ -155,7 +160,7 @@
             (assoc m :id (:obfuscated-id m)))
           :obfuscated-id))
 
-(defn- extern-resource-entity
+(defn- extern-resource
   "Transform a Datomic entity that represents a Sagittariidae resource into a
   form suitable for presentation to external agents.  In general this means
   stripping out implementation-specific fields and replacing internal
@@ -164,33 +169,57 @@
   (assert (-> x :res/type :db/ident) "Type entity for attribute has not been expanded; did you forget to expand this in a `pull` expression?")
   (let [ext-name (unqual-name
                   ((-> x
-                       :res/type                  ; construct the name of
+                       :res/type                  ; Construct the name of
                        :db/ident                  ; the `name` attribute of
                        name                       ; the entity, and fetch it
                        (#(s/join "/" [% "name"])) ; e.g. `(:project/name x)`
                        keyword) x))]
-    (extern-id (-<> x
-                    (dissoc :db/id :res/type)
-                    (untype-attrs)
-                    (assoc :name ext-name)))))
+    (extern-id-in-resource
+     (let [ext-res (-<> x (dissoc :db/id :res/type) (untype-attrs))]
+       (if ext-name                     ; Not all resources have names.  Some,
+         (assoc ext-res :name ext-name) ; like `stage`s have only numeric IDs.
+         ext-res)))))
 
-(defn- extern-entity
-  "Helper function to eternalise Sagittariidae Datomic entities.  Intended for
-  use with `clojure.walk/prewalk` to recursively process structures."
+(derive ::resource         ::entity)
+(derive :res.type/project  ::resource)
+(derive :res.type/method   ::resource)
+(derive :res.type/sample   ::resource)
+(derive :res.type/stage    ::resource)
+(derive :res.type/datafile ::resource)
+
+(defmulti extern
+  (fn [x]
+    (when (map? x)
+      (or (get-in x [:res/type :db/ident])
+          ::entity))))
+
+(defmethod extern :default
+  [x]
+  x)
+
+(defmethod extern ::entity
   [e]
-  (cond (and (map? e) (contains? e :res/type))
-        (extern-resource-entity e)
-        (map? e)
-        (untype-attrs (dissoc e :db/id))
-        :else e))
+  (untype-attrs (dissoc e :db/id)))
+
+(defmethod extern ::resource
+  [r]
+  (extern-resource r))
+
+(defmethod extern :res.type/stage
+  [stage]
+  (let [stage (extern-resource stage)
+        method (extern (:method stage))
+        annotations (map #(s/join "=" [(:annotation/k %) (:annotation/v %)])
+                         (:annotation stage))]
+    (as-> stage stage
+      (if-not (empty? annotations)
+        (assoc stage :annotation (s/join "; " annotations))
+        stage)
+      (assoc stage :method (:id method)))))
 
 (defn- externalize
   [x]
-  (prewalk extern-entity x))
-
-(defn- mk-sample-name
-  [project-id sample-name]
-  (s/join "$" [project-id sample-name]))
+  (prewalk extern x))
 
 ;;; ----------------------------------------------------------------------- ;;;
 
@@ -200,7 +229,12 @@
                                                :method/id
                                                :method/obfuscated-id
                                                :method/name]}
-                               {:stage/annotation [:annotation/k :annotation/v]}]}]})
+                               {:stage/annotation [{:res/type [:db/ident]} :annotation/k :annotation/v]}]}]
+   :stage '[* {:res/type [:db/ident]
+               :stage/method [{:res/type [:db/ident]}
+                              :method/name
+                              :method/obfuscated-id]
+               :stage/annotation [{:res/type [:db/ident]} :annotation/k :annotation/v]}]})
 
 (defn add-project
   [cn name mask]
@@ -255,13 +289,29 @@
 
 (defn get-samples
   [db project-id]
-  (externalize (d/q (template
-                     [:find  [(pull ?s ~(:sample pull-specs)) ...]
-                      :in    $ ?p-id
-                      :where [?p :project/obfuscated-id ?p-id]
-                      [?p :project/sample ?s]])
-                    db (rn->id project-id))))
+  (externalize
+   (d/q (template
+         [:find  [(pull ?s ~(:sample pull-specs)) ...]
+          :in    $ ?p-id
+          :where [?p :project/obfuscated-id ?p-id]
+          [?p :project/sample ?s]])
+        db (rn->id project-id))))
 
 (defn add-stage
   [cn project-id sample-id method-id annotations]
   (tx cn (tx-data:add-stage (d/db cn) (rn->id sample-id) (rn->id method-id) annotations)))
+
+(defn get-stages
+  [db project-id sample-id]
+  (map
+   ;; Unlike other resources, a stage has no name.  So we construct a name
+   ;; based on the position of the stage in the sequence.
+   #(assoc %1 :id (s/join "-" [(:id %1) (format "%03d" (inc %2))]))
+   (externalize (sort #(compare (:stage/id %1) (:stage/id %2))
+                      (d/q (template
+                            [:find  [(pull ?stage ~(:stage pull-specs)) ...]
+                             :in    $ ?s-id
+                             :where [?sample :sample/obfuscated-id ?s-id]
+                             [?sample :sample/stage ?stage]])
+                           db (rn->id sample-id))))
+   (range)))

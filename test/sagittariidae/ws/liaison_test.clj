@@ -19,22 +19,25 @@
   (is (= [[:foo 0] [:bar 1]]
          (#'<>/untype-attrs [[:ns0/foo 0] [:ns1/bar 1]]))))
 
-(deftest test:extern-id
+(deftest test:extern-id-in-resource
   (is (= {:id "f00-bar" :name "Bar"}
-         (#'<>/extern-id {:id 0 :obfuscated-id "f00" :name "Bar"})))
+         (#'<>/extern-id-in-resource {:id 0 :obfuscated-id "f00" :name "Bar"})))
   (is (= {:id "f00"}
-         (#'<>/extern-id {:id 0 :obfuscated-id "f00"}))))
+         (#'<>/extern-id-in-resource {:id 0 :obfuscated-id "f00"}))))
 
-(def extern-resource-entity #'<>/extern-resource-entity)
-
-(deftest test:extern-resource-entity
-  (is (= {:id "f00-bar" :name "Bar" :attr0 "nil" :attr1 "one"}
-         (extern-resource-entity {:res/type            {:db/ident :res.type/thing}
+(deftest test:extern-resource
+  (testing "general case"
+    (is (= {:id "f00-bar" :name "Bar" :attr0 "nil" :attr1 "one"}
+           (#'<>/extern-resource {:res/type            {:db/ident :res.type/thing}
                                   :thing/id            0
                                   :thing/obfuscated-id "f00"
                                   :thing/name          "Bar"
                                   :thing/attr0         "nil"
                                   :other-thing/attr1   "one"}))))
+  (testing "no name"
+    (#'<>/extern-resource {:res/type            {:db/ident :res.type/thing}
+                           :thing/id            0
+                           :thing/obfuscated-id "f00"})))
 
 (deftest test:get-projects
   (let [db (as-> (mk-db) db
@@ -165,13 +168,13 @@
 
 (defn- prepare-db:add-stage
   []
-  (let [db (as-> (mk-db) db (speculate db (#'<>/tx-data:add-project db "p1" ".*")))
-        p1 (name->obid db :project "p1")
-        db (speculate db (#'<>/tx-data:add-method db "m1" ""))
-        m1 (name->obid db :method "m1")
-        db (speculate db (#'<>/tx-data:add-sample db p1 "s1"))
-        s1 (name->obid db :sample (#'<>/mk-sample-name p1 "s1"))]
-    {:db db :p1 p1 :m1 m1 :s1 s1}))
+  (as-> {} m
+    (assoc m :db (as-> (mk-db) db (speculate db (#'<>/tx-data:add-project db "p1" ".*"))))
+    (assoc m :p1 (name->obid (:db m) :project "p1"))
+    (assoc m :db (speculate (:db m) (#'<>/tx-data:add-method (:db m) "m1" "")))
+    (assoc m :m1 (name->obid (:db m) :method "m1"))
+    (assoc m :db (speculate (:db m) (#'<>/tx-data:add-sample (:db m) (:p1 m) "s1")))
+    (assoc m :s1 (name->obid (:db m) :sample (#'<>/mk-sample-name (:p1 m) "s1")))))
 
 (deftest test:add-stage
   (testing "no annotations"
@@ -216,3 +219,34 @@
       (is (reduce (fn [x y] (and x y))
                   (map (fn [k] (contains? (first (:stage rs)) k))
                        [:method :annotation]))))))
+
+(defn- prepare-db:get-stages
+  []
+  (as-> {} m
+    (assoc m :db (as-> (mk-db) db (speculate db (#'<>/tx-data:add-project db "p1" ".*"))))
+    (assoc m :p1 (name->obid (:db m) :project "p1"))
+    (assoc m :db (speculate (:db m) (#'<>/tx-data:add-method (:db m) "m1" "")))
+    (assoc m :m1 (name->obid (:db m) :method "m1"))
+    (assoc m :db (speculate (:db m) (#'<>/tx-data:add-method (:db m) "m2" "")))
+    (assoc m :m2 (name->obid (:db m) :method "m2"))
+    (assoc m :db (speculate (:db m) (#'<>/tx-data:add-sample (:db m) (:p1 m) "s1")))
+    (assoc m :s1 (name->obid (:db m) :sample (#'<>/mk-sample-name (:p1 m) "s1")))))
+
+(deftest test:get-stages
+  (testing "annotations are included when present"
+    (let [{:keys [db p1 s1 m1]} (prepare-db:get-stages)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {"k1" "v1"}))]
+      (is (= [{:method "XZOQ0-m1" :id "Drn1Q-001" :annotation "k1=v1"}]
+             (<>/get-stages db p1 s1)))))
+  (testing "annotations are absent when not present"
+    (let [{:keys [db p1 s1 m1]} (prepare-db:get-stages)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {}))]
+      (is (= [{:method "XZOQ0-m1" :id "Drn1Q-001"}]
+             (<>/get-stages db p1 s1)))))
+  (testing "multiple stages are returned"
+    (let [{:keys [db p1 s1 m1 m2]} (prepare-db:get-stages)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {}))
+          db (speculate db (#'<>/tx-data:add-stage db s1 m2 {}))]
+      (is (= [{:method "XZOQ0-m1", :id "Drn1Q-001"}
+              {:method "Xd9k2-m2", :id "bQ8bm-002"}]
+             (<>/get-stages db p1 s1))))))
