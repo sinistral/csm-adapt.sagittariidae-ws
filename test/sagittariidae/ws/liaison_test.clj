@@ -4,7 +4,7 @@
             [clojure.test             :refer [deftest is testing]]
             [datomic.api              :as    d]
             [sagittariidae.ws.db      :as    db]
-            [sagittariidae.ws.db-aux  :refer [mk-db speculate]]
+            [sagittariidae.ws.db-aux  :refer [mk-db name->obid speculate]]
             [sagittariidae.ws.liaison :as    <>]))
 
 (deftest test:extern-name
@@ -65,17 +65,7 @@
              (speculate db (#'<>/tx-data:add-method db "m2" "")))]
     (is (= [{:name "m1", :id "XZOQ0-m1" :description ""}
             {:name "m2", :id "Xd9k2-m2" :description ""}]
-           (<>/get-methods db)))))
-
-(defn name->obid
-  [db t n]
-  (let [type-attr (fn [t a] (keyword (clojure.string/join "/" [(name t) a])))
-        name-attr (type-attr t "name")
-        obid-attr (type-attr t "obfuscated-id")]
-    (obid-attr (ffirst (d/q '[:find  (pull ?e [*])
-                              :in    $ ?a ?n
-                              :where [?e ?a ?n]]
-                            db name-attr n)))))
+           (sort #(compare (:name %1) (:name %2)) (<>/get-methods db))))))
 
 (deftest test:add-sample
   (testing "one new sample"
@@ -100,9 +90,9 @@
                            [?p :project/name "p1"]]
                          db)]
         (is (= [1 2]
-               (map :sample/id samples)))
+               (sort (map :sample/id samples))))
         (is (= (map #(s/join "$" [pn %]) ["s1" "s2"])
-               (map :sample/name samples))))))
+               (sort (map :sample/name samples)))))))
   (testing "duplicate sample"
     (let [db (as-> (mk-db) db
                (speculate db (#'<>/tx-data:add-project db "p1" ".*")))
