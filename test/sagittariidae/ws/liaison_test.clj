@@ -4,7 +4,7 @@
             [clojure.test             :refer [deftest is testing]]
             [datomic.api              :as    d]
             [sagittariidae.ws.db      :as    db]
-            [sagittariidae.ws.db-aux  :refer [mk-db name->obid speculate]]
+            [sagittariidae.ws.db-aux  :refer [db-uri mk-db name->obid speculate]]
             [sagittariidae.ws.liaison :as    <>]))
 
 (deftest test:extern-name
@@ -166,7 +166,7 @@
     (assoc m :db (speculate (:db m) (#'<>/tx-data:add-sample (:db m) (:p1 m) "s1")))
     (assoc m :s1 (name->obid (:db m) :sample (#'<>/mk-sample-name (:p1 m) "s1")))))
 
-(deftest test:add-stage
+(deftest test:add-stage-tx-data
   (testing "no annotations"
     (let [{:keys [db m1 s1]} (prepare-db:add-stage)
           db (speculate db (#'<>/tx-data:add-stage db s1 m1 {}))]
@@ -195,7 +195,31 @@
       (is (= [{:sample/obfuscated-id "OQn6Q"}]
              (d/q '[:find  [(pull ?sample [:sample/obfuscated-id])]
                     :where [?sample :sample/stage]]
-                  db))))))
+                  db)))))
+  (testing "with invalid token: no stages"
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Stage token mismatch.*required \"KEzGq\""
+          (let [{:keys [db m1 s1]} (prepare-db:add-stage)]
+            (speculate db (#'<>/tx-data:add-stage db s1 m1 {} "invalid-token"))))))
+  (testing "with invalid token: 1 stage"
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Stage token mismatch.*required \"WZOaE\""
+          (let [{:keys [db m1 s1]} (prepare-db:add-stage)
+                db (speculate db (#'<>/tx-data:add-stage db s1 m1 {}))]
+            (speculate db (#'<>/tx-data:add-stage db s1 m1 {} "invalid-token"))))))
+  (testing "with valid token: no stages"
+    (let [{:keys [db m1 s1]} (prepare-db:add-stage)]
+      (speculate db (#'<>/tx-data:add-stage db s1 m1 {} "KEzGq"))))
+  (testing "with invalid token: 1 stage"
+    (let [{:keys [db m1 s1]} (prepare-db:add-stage)
+          db (speculate db (#'<>/tx-data:add-stage db s1 m1 {} "KEzGq"))]
+      (speculate db (#'<>/tx-data:add-stage db s1 m1 {} "WZOaE")))))
+
+(deftest test:add-stage
+  (testing "returns the added stage"
+    (let [{:keys [db p1 m1 s1]} (prepare-db:add-stage)]
+      (with-redefs [<>/-add-stage (fn [_1 _2 s m a t]
+                                    (speculate db (#'<>/tx-data:add-stage db s m a t)))]
+        (is (= {:id "Drn1Q" :method "XZOQ0-m1" :annotation "x=y"}
+               (<>/add-stage nil p1 s1 m1 "x=y")))))))
 
 (deftest test:get-sample-with-stage
   (testing "no stage key present when no stages"

@@ -7,6 +7,7 @@
             [clojure.string      :as    s]
             [clojure.walk        :refer [prewalk]]
             [datomic.api         :as    d]
+            [hashids.core        :as    hashid]
             [ring.util.codec     :refer [url-encode]]
             [mantle.io           :refer [fmtstr]]
             [sagittariidae.ws.db :refer [tx]]
@@ -93,19 +94,22 @@
              :project/sample sample-eid}))))
 
 (defn- tx-data:add-stage
-  [db sample-id method-id annotations]
-  (let [stg-eid   (d/tempid :db.part/user)
-        ann-eids  (repeatedly (count annotations) #(d/tempid :db.part/user))
-        stg-attrs {:stage/method     [:method/obfuscated-id method-id]
-                   :stage/annotation (apply hash-set ann-eids)}]
-    (concat
-     ;; build the annotation entities
-     (mapcat tx-data:add-annotation ann-eids (seq annotations))
-     ;; txform for the stage resource
-     (tx-data:add-resource stg-eid :res.type/stage stg-attrs)
-     ;; link the stage to the sample
-     [{:db/id [:sample/obfuscated-id sample-id]
-       :sample/stage stg-eid}])))
+  ([db sample-id method-id annotations]
+   (tx-data:add-stage db sample-id method-id annotations nil))
+  ([db sample-id method-id annotations token]
+   (let [stg-eid   (d/tempid :db.part/user)
+         ann-eids  (repeatedly (count annotations) #(d/tempid :db.part/user))
+         stg-attrs {:stage/method     [:method/obfuscated-id method-id]
+                    :stage/annotation (apply hash-set ann-eids)}]
+     (concat
+      (when token [[:validate-stage-token sample-id token]])
+      ;; build the annotation entities
+      (mapcat tx-data:add-annotation ann-eids (seq annotations))
+      ;; txform for the stage resource
+      (tx-data:add-resource stg-eid :res.type/stage stg-attrs)
+      ;; link the stage to the sample
+      [{:db/id [:sample/obfuscated-id sample-id]
+        :sample/stage stg-eid}]))))
 
 ;;; ----------------------------------------------------------------------- ;;;
 
@@ -297,9 +301,73 @@
           [?p :project/sample ?s]])
         db (rn->id project-id))))
 
+(defn- -add-stage
+  "The side-effecting part of `add-stage`, extracted for testability.  Returns
+  a DB with the changes applied."
+  [cn project-id sample-id method-id annotations token]
+  (tx cn (tx-data:add-stage (d/db cn)
+                            (rn->id sample-id)
+                            (rn->id method-id)
+                            annotations
+                            token)))
+
+(defn ^{:dynamic true} *malformed-annotation*
+  ([a]
+   (*malformed-annotation* a nil))
+  ([a cause]
+   (throw
+    (ex-info
+     (fmtstr "The annotation ~s is not a valid key-value pair (e.g. \"x=y\")" a)
+     {:type ::malformed-annotation :annotation a}
+     cause))))
+
+(defn- parse-annotations
+  "Parse a string that contains annotations in key-value pairs into its
+  constituent parts."
+  [s]
+  (if-not (empty? s)
+    (try
+      (letfn [(parse-annotation [s]
+                (if-let [groups (re-seq #"([^=]+)=([^=]+)" s)]
+                  (->> groups first rest (map s/trim))
+                  (*malformed-annotation* s)))]
+        (apply hash-map
+               (apply concat
+                      (map parse-annotation (s/split s #";")))))
+      (catch Throwable t
+        (*malformed-annotation* s t)))
+    {}))
+
 (defn add-stage
-  [cn project-id sample-id method-id annotations]
-  (tx cn (tx-data:add-stage (d/db cn) (rn->id sample-id) (rn->id method-id) annotations)))
+  ([cn project-id sample-id method-id annotations]
+   (add-stage cn project-id sample-id method-id annotations nil))
+  ([cn project-id sample-id method-id annotations token]
+   (let [am (parse-annotations annotations)
+         db (-add-stage cn project-id sample-id method-id am token)]
+     (->> (d/q '[:find  [(max ?n)]
+                 :where [_ :stage/id ?n]]
+               db)
+          (first)
+          (d/q '[:find  [?stage]
+                 :in    $ ?stage-id
+                 :where [?stage :stage/id ?stage-id]]
+               db)
+          (first)
+          (d/pull db (:stage pull-specs))
+          (externalize)))))
+
+(defn- get-stage-hashid-opts
+  [db]
+  (zipmap [:salt :min-length]
+          (d/q '[:find  [?s ?l]
+                 :where [?e :res-archetype/type :res.type/stage-token]
+                        [?e :res-archetype/hashid-salt ?s]
+                        [?e :res-archetype/hashid-length ?l]]
+               db)))
+
+(defn get-stage-token
+  [db n]
+  (hashid/encode (get-stage-hashid-opts db) n))
 
 (defn get-stages
   [db project-id sample-id]
